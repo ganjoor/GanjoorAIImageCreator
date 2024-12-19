@@ -3,8 +3,7 @@ using Betalgo.Ranul.OpenAI;
 using Newtonsoft.Json;
 using System.Net;
 using Betalgo.Ranul.OpenAI.ObjectModels.RequestModels;
-using System.Drawing;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using static Betalgo.Ranul.OpenAI.ObjectModels.RealtimeModels.RealtimeEventTypes;
 
 namespace GanjoorAIImageCreator
 {
@@ -33,11 +32,19 @@ namespace GanjoorAIImageCreator
                 for (int poetId = lastPoetId; poetId > 1; poetId--)
                 {
                     txtPoetId.Text = poetId.ToString();
-                    if(Directory.Exists($"C:\\ai\\{poetId}"))
+
+                    string folderMain = $"C:\\ai\\{poetId}";
+
+                    if (Directory.Exists(folderMain))
                     {
                         continue;//another instance is processing it
                     }
-                    Directory.CreateDirectory($"C:\\ai\\{poetId}");
+                    string folder = $"C:\\ai\\{poetId}-temp";
+                    if (!Directory.Exists(folder))
+                    {
+                        Directory.CreateDirectory(folder);
+                    }
+                    
                     lblStatus.Text = "فراخوانی ...";
 
                     Cursor = Cursors.WaitCursor;
@@ -61,6 +68,8 @@ namespace GanjoorAIImageCreator
 
                     foreach (int poemId in poemlist)
                     {
+                        if (File.Exists($"{folder}\\{poetId}\\{poemId}-p.txt"))
+                            continue;
                         HttpResponseMessage response = await httpClient.GetAsync($"https://api.ganjoor.net/api/ganjoor/poem/{poemId}?catInfo=false&catPoems=false&rhymes=false&recitations=false&images=false&songs=false&comments=false&verseDetails=false&navigation=false&relatedpoems=false");
                         if (response.StatusCode != HttpStatusCode.OK)
                         {
@@ -193,17 +202,45 @@ namespace GanjoorAIImageCreator
 
                                 if (!string.IsNullOrEmpty(imageUrl))
                                 {
-
-                                    var imageData = await httpClient.GetByteArrayAsync(imageUrl);
+                                    byte[]? imageData = null;
+                                    int _ImportRetryCount = 10;
+                                    int _ImportRetryInitialSleep = 500;
+                                    int retryCount = 0;
+                                    while (retryCount < _ImportRetryCount)
+                                    {
+                                        Thread.Sleep(_ImportRetryInitialSleep * (retryCount + 1));
+                                        try
+                                        {
+                                            imageData = await httpClient.GetByteArrayAsync(imageUrl);
+                                            break;
+                                        }
+                                        catch
+                                        {
+                                            retryCount++; ;
+                                        }
+                                    }
+                                    if (imageData == null)
+                                    {
+                                        MessageBox.Show("imageData == null");
+                                        return;
+                                    }
                                     using var stream = new MemoryStream(imageData);
                                     using var originalImage = Image.FromStream(stream);
-                                    originalImage.Save($"C:\\ai\\{poetId}\\{poemId}.jpg", System.Drawing.Imaging.ImageFormat.Jpeg);
-                                    File.WriteAllText($"C:\\ai\\{poetId}\\{poemId}.txt", story);
-                                    File.WriteAllText($"C:\\ai\\{poetId}\\{poemId}-p.txt", prompt);
+                                    originalImage.Save($"{folder}\\{poemId}.jpg", System.Drawing.Imaging.ImageFormat.Jpeg);
+                                    File.WriteAllText($"{folder}\\{poetId}\\{poemId}.txt", story);
+                                    File.WriteAllText($"{folder}\\{poetId}\\{poemId}-p.txt", prompt);
                                 }
                             }
                         }
                     }
+
+                    Directory.CreateDirectory(folderMain);
+                    foreach(var fileName in Directory.GetFiles(folder))
+                    {
+                        File.Move(fileName, Path.Combine(folderMain, Path.GetFileName(fileName)));
+                    }
+                    Directory.Delete(folder);
+
                 }
             }
         }
