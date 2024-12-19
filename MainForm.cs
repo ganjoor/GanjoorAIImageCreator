@@ -227,8 +227,8 @@ namespace GanjoorAIImageCreator
                                     using var stream = new MemoryStream(imageData);
                                     using var originalImage = Image.FromStream(stream);
                                     originalImage.Save($"{folder}\\{poemId}.jpg", System.Drawing.Imaging.ImageFormat.Jpeg);
-                                    File.WriteAllText($"{folder}\\{poetId}\\{poemId}.txt", story);
-                                    File.WriteAllText($"{folder}\\{poetId}\\{poemId}-p.txt", prompt);
+                                    File.WriteAllText($"{folder}\\{poemId}.txt", story);
+                                    File.WriteAllText($"{folder}\\{poemId}-p.txt", prompt);
                                 }
                             }
                         }
